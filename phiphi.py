@@ -49,11 +49,13 @@ while (True):
             enter(False, symbol[i]) # Sell
             symbolEnter.append(symbol[i])
             symbol.remove(symbol[i])
+            con.close()
             exit(1)
         if (rsiValue < lower_rsi):
             enter(True, symbol[i]) # Buy
             symbolEnter.append(symbol[i])
             symbol.remove(symbol[i])
+            con.close()
             exit(1)
     time.sleep(5)
     print("----------------");
