@@ -10,13 +10,13 @@ from pyti.relative_strength_index import relative_strength_index as rsi
 #moi
 token = 'cb0685731aac9d8a261be8c73e16d33c33069722'
 symbol = ['EUR/USD', 'GBP/USD', 'EUR/JPY', 'USD/JPY', 'CHF/JPY']
-timeframe = "m15"           # (m1,m5,m15,m30,H1,H2,H3,H4,H6,H8,D1,W1,M1)
+timeframe = "m1"
 rsi_periods = 14
 upper_rsi = 70.0
 lower_rsi = 30.0
 amount = 1
-stop = -10
-limit = None
+stop = -5
+limit = 10
 #############################
 
 symbolEnter = []
@@ -32,7 +32,7 @@ def enter(is_buy, d):
 
 
 def getLastRsiValue(devise):
-    data = con.get_candles(devise, period='m1', number=200)
+    data = con.get_candles(devise, period=timeframe, number=200)
     rsiList = rsi(data['bidclose'], rsi_periods)
     return rsiList[-1];
 
