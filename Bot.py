@@ -34,7 +34,7 @@ def position(is_buy, d):
 def getLastRsiValue(devise):
     data = con.get_candles(devise, period=timeframe, number=200)
     rsiList = rsi(data['bidclose'], rsi_periods)
-    return rsiList[-1];
+    return rsiList[-1]
 
 
 def checkIfClosedPosition():
