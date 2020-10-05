@@ -8,14 +8,14 @@ from pyti.relative_strength_index import relative_strength_index as rsi
 #phiphi
 #token = "1a7dd8a06ab9e998d650cb750f2bd039860af8c2"
 #moi
-token = 'cb0685731aac9d8a261be8c73e16d33c33069722'
+token = '52f024b13ae656b23cdbf7af83b784fece1827f8'
 symbols = ['EUR/USD', 'GBP/USD', 'EUR/JPY', 'USD/JPY', 'CHF/JPY']
 timeframe = "m1"
 rsi_periods = 14
 upper_rsi = 70.0
 lower_rsi = 30.0
 amount = 1
-stop = -5
+stop = -10
 limit = 10
 #############################
 
@@ -83,21 +83,3 @@ while (True):
     print("----------------");
 
 con.close()
-
-
-# This function closes all positions that are in the direction BuySell, "B" = Close All Buy Positions, "S" = Close All Sell Positions, uses symbol
-def exit(BuySell=None):
-    openpositions = con.get_open_positions(kind='list')
-    isbuy = True
-    if BuySell == "S":
-        isbuy = False
-    for position in openpositions:
-        if position['currency'] == symbols:
-            if BuySell is None or position['isBuy'] == isbuy:
-                print("   Closing tradeID: " + position['tradeId'])
-                try:
-                    closetrade = con.close_trade(trade_id=position['tradeId'], amount=position['amountK'])
-                except:
-                    print("   Error Closing Trade.")
-                else:
-                    print("   Trade Closed Successfully.")
