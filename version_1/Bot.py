@@ -180,7 +180,7 @@ def liveApp():
             position(False, symbol, 500, limit, stop) # Sell
         #time.sleep(5)
 
-con = fxcmpy.fxcmpy(access_token=token, log_level='error', server='demo', log_file='log.txt')
+con = fxcmpy.fxcmpy(access_token=token, log_level='error', server='demo', log_file='../log.txt')
 
 if (len(sys.argv) > 1 and sys.argv[1].lower() == '-b'):
     backTesting()
