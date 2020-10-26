@@ -1,4 +1,6 @@
 import fxcmpy
+import socketio
+import sys
 import time
 import datetime as dt
 from pyti.relative_strength_index import relative_strength_index as rsi
@@ -6,123 +8,63 @@ from pyti.simple_moving_average import simple_moving_average as sma
 from pyti.moving_average_convergence_divergence import moving_average_convergence_divergence as macd
 from pyti.exponential_moving_average import exponential_moving_average as ema
 
-
 ###### USER PARAMETERS ######
 #phiphi
 #token = "1a7dd8a06ab9e998d650cb750f2bd039860af8c2"
 #moi
 token = '52f024b13ae656b23cdbf7af83b784fece1827f8'
-symbols = ['EUR/USD', 'GBP/USD', 'EUR/JPY', 'USD/JPY', 'CHF/JPY']
+symbols = ['EUR/USD', 'GBP/USD', 'AUD/USD']
 timeframe = "m1"
 rsi_periods = 14
 upper_rsi = 70.0
 lower_rsi = 30.0
-amount = 1
-stop = -10
-limit = 10
 bTValues = []
+buyposition = 0
+sellposition = 0
+ind = 0
 #############################
 
 openSymbols = []
 
-# def rsi(data, period):
-
-#     catch_errors.check_for_period_error(data, period)
-
-#     period = int(period)
-#     changes = [data_tup[1] - data_tup[0] for data_tup in zip(data[::1], data[1::1])]
-
-#     filtered_gain = [val < 0 for val in changes]
-#     gains = [0 if filtered_gain[idx] == True else changes[idx] for idx in range(0, len(filtered_gain))]
-
-#     filtered_loss = [val > 0 for val in changes]
-#     losses = [0 if filtered_loss[idx] == True else abs(changes[idx]) for idx in range(0, len(filtered_loss))]
-
-#     avg_gain = np.mean(gains[:period])
-#     avg_loss = np.mean(losses[:period])
-
-#     rsi = []
-#     if avg_loss == 0:
-#         rsi.append(100)
-#     else:
-#         rs = avg_gain / avg_loss
-#         rsi.append(100 - (100 / (1 + rs)))
-
-#     for idx in range(1, len(data) - period):
-#         avg_gain = ((avg_gain * (period - 1) +
-#                     gains[idx + (period - 1)]) / period)
-#         avg_loss = ((avg_loss * (period - 1) +
-#                     losses[idx + (period - 1)]) / period)
-
-#         if avg_loss == 0:
-#             rsi.append(100)
-#         else:
-#             rs = avg_gain / avg_loss
-#             rsi.append(100 - (100 / (1 + rs)))
-
-#     rsi = fill_for_noncomputable_vals(data, rsi)
-
-#     return rsi
-
-def position(is_buy, d):
+def position(is_buy, d, amount, limit, stop):
     print("Opening a position")
+    print(amount)
+    print(limit)
+    print(stop)
+    print(d)
+    print(is_buy)
     opentrade = con.open_trade(symbol=d, is_buy=is_buy,
                             amount=amount, time_in_force='GTC',
-                            order_type='AtMarket', is_in_pips=True,
+                            order_type='AtMarket', is_in_pips=False,
                             limit=limit, stop=stop)
-
-
-
-
-def getLastRsiValue(devise):
-    data = con.get_candles(devise, period=timeframe, number=200)
-    rsiList = rsi(data['bidclose'], rsi_periods)
-    return rsiList[-1]
-
 
 def checkIfClosedPosition():
     #ind indicates whether the symbol has still an open position or not. 1 for yes and 0 for no.
     ind = 0
     #retrieve open positions
     openpositions = con.get_open_positions(kind='list')
-    for symbol in openSymbols:
-        for position in openpositions:
-            if (position['currency'] == symbol):
-                ind = 1
-        #symbol does not have a current open position
-        if (ind == 0):
-            openSymbols.remove(symbol)
-            symbols.append(symbol)
-        #reste indicator
-        else:
-            ind = 0
+    for position in openpositions:
+        if (position['currency'] == 'EUR/USD'):
+            ind = 1
+    return ind
 
-# def checkProfitLoss(ind, symbol, buyposition, sellposition):
-#     if (sellposition != 0 and sellposition - bTValues['askclose'][ind] > 0.001):
-#         profittrades += 1
-#         sellposition = 0
-#         print("profit made!")
-#     if (sellposition != 0 and sellposition - bTValues['askclose'][ind] < 0.001):
-#         sellposition = 0
-#         losstrades += 1
-#         print("loss made!")
-#     if (buyposition != 0 and buyposition - bTValues['bidclose'][ind] < 0.001):
-#         buyposition = 0
-#         profittrades +=1
-#         print("prodit made!")
-#     if (buyposition != 0 and buyposition - bTValues['bidclose'][ind] > 0.001):
-#         buyposition = 0
-#         losstrades +=1
-#         print("loss made!")
+def checkemaCross(emaInd, slowemaList, fastemaList, stockslowEma, stockfastEma):
 
+    if (stockfastEma < stockslowEma and fastemaList[-1] > slowemaList[-1]):
+        emaInd = 1
+    if (stockfastEma > stockslowEma and fastemaList[-1] < slowemaList[-1]):
+        emaInd = 0
+    return emaInd
 
 def backTesting():
 
-    ind = 0
-    profittrades = 0
-    losstrades = 0
-    sellposition = 0
-    buyposition = 0
+    global ind
+    balance = 50000
+    global sellposition
+    global buyposition
+    stockfastEma = 0
+    stockslowEma = 0
+    emaInd = 0
     sDay = int(input("Enter backtesting initial day as [DD] :"))
     sMonth = int(input("Enter backtesting initial month as [MM] :"))
     sYear = int(input("Enter backtesting initial year as [YYYY] :"))
@@ -131,77 +73,112 @@ def backTesting():
     eMonth = int(input("Enter backtesting ending month as [MM] :"))
     eYear = int(input("Enter backtesting ending year as [YYYY] :"))
     eDate = dt.datetime(eYear, eMonth, eDay)
-    bTtimeframe = input("Enter backtesting timeframe :")
 
     for symbol in symbols:
         ind = 0
-        bTValues = con.get_candles(symbol, period=bTtimeframe, start=sDate, end=eDate, columns=['date', 'bidclose', 'askclose'], with_index=False)
-        
+        emaInd = 0
+        stockfastEma = 0
+        stockslowEma = 0
+        buyposition = 0
+        sellposition = 0
+        bTValues = con.get_candles(symbol, period="H1", start=sDate, end=eDate, columns=['date', 'bidclose', 'askclose'], with_index=False)
 
         while (ind < len(bTValues)):
             #STRATEGY TO TEST
-            rsiData = con.get_candles(symbol, period=bTtimeframe, end=bTValues['date'][ind], number=500)
-            smaData = con.get_candles(symbol, period="H1", end=bTValues['date'][ind], number=111)
-            emaData = con.get_candles(symbol, period="H1", end=bTValues['date'][ind], number=27)
+            rsiData = con.get_candles(symbol, period="H1", end=bTValues['date'][ind], number=500)
+            smaData = con.get_candles(symbol, period="H1", end=bTValues['date'][ind], number=110)
+            slowemaData = con.get_candles(symbol, period="H1", end=bTValues['date'][ind], number=26)
+            fastemaData = con.get_candles(symbol, period="H1", end=bTValues['date'][ind], number=9)
 
             rsiList = rsi(rsiData['bidclose'], 14)
             smaList = sma(smaData['bidclose'], 110)
+            slowemaList = ema(slowemaData['bidclose'], 26)
+            fastemaList = ema(fastemaData['bidclose'], 9)
 
-            print(rsiList[-1])
-            print(smaList[-1])
+            if (stockfastEma == 0 and stockslowEma == 0):
+                stockfastEma = fastemaList[-1]
+                stockslowEma = slowemaList[-1]
 
-        #     if (sellposition == 0 and rsiList[-1] > 70):
-        #         print("opened sell position")
-        #         sellposition = bTValues['bidclose'][ind] #askclose < bidclose initial pour profit
-        #     if (buyposition == 0 and rsiList[-1] < 30):
-        #         print("opened buy position")
-        #         buyposition = bTValues['askclose'][ind] #bidclose > askclose inital pour profit
-        #     # checkProfitLoss(ind, symbol, buyposition, sellposition)
-        #     if (sellposition != 0 and sellposition - bTValues['askclose'][ind] > 0.001):
-        #         profittrades += 1
-        #         sellposition = 0
-        #         print("profit made!")
-        #     if (sellposition != 0 and sellposition - bTValues['askclose'][ind] < 0.001):
-        #         sellposition = 0
-        #         losstrades += 1
-        #         print("loss made!")
-        #     if (buyposition != 0 and buyposition - bTValues['bidclose'][ind] < 0.001):
-        #         buyposition = 0
-        #         profittrades +=1
-        #         print("profit made!")
-        #     if (buyposition != 0 and buyposition - bTValues['bidclose'][ind] > 0.001):
-        #         buyposition = 0
-        #         losstrades +=1
-        #         print("loss made!")
-        #     ind+=1
-        # print("You made " + str(profittrades) + "profitable trades on " + symbol + " forex!")
-        # print("You made " + str(losstrades) + "unprofitable trades on " + symbol + " forex!")
+            emaInd = checkemaCross(emaInd, slowemaList, fastemaList, stockslowEma, stockfastEma)
+
+            if (buyposition == 0 and emaInd == 1 and bTValues['bidclose'][ind] > smaList[-1]):
+                print("You opened a buy position on " + str(bTValues['date'][ind]))
+                print()
+                buyposition = bTValues['bidclose'][ind]
+
+            if (sellposition == 0 and bTValues['bidclose'][ind] < smaList[-1] and emaInd == 0):
+                print("You opened a sell position on " + str(bTValues['date'][ind]))
+                print()
+                sellposition = bTValues['bidclose'][ind]
+
+            stockfastEma = fastemaList[-1]
+            stockslowEma = slowemaList[-1]
+
+            if (buyposition != 0 and bTValues['bidclose'][ind] < buyposition - (buyposition/10000) * 70):
+                buyposition = 0
+                balance = balance - ((balance/10000) * 70)
+                print("You lost money!")
+                print("New balance : " + str(balance))
+                print()
+            if (buyposition != 0 and bTValues['bidclose'][ind] >= buyposition + (buyposition/100)*16/10):
+                buyposition = 0
+                balance = balance + ((balance/100)*16/10)
+                print("You won money!")
+                print("New balance : " + str(balance))
+                print()
+            if (sellposition != 0 and bTValues['bidclose'][ind] > sellposition + (sellposition/10000) * 70):
+                sellposition = 0
+                balance = balance - ((balance/10000) * 70)
+                print("You lost money!")
+                print("New balance : " + str(balance))
+                print()
+            if (sellposition != 0 and bTValues['bidclose'][ind] < sellposition - (sellposition/100)*16/10):
+                sellposition = 0
+                balance = balance + ((balance/100)*16/10)
+                print("You won money!")
+                print("New balance : " + str(balance))
+                print()
+            ind+=1
 
 
 def liveApp():
-    #while (True):
-        # print(openSymbols)
-        # print(symbols)
-        # checkIfClosedPosition()
-        # for symbol in symbols:
-        #     rsiValue = getLastRsiValue(symbol)
+    
+    emaInd = 0
+    stockfastEma = 0
+    stockslowEma = 0
+    liveValue = 0
+    limit = 0
+    stop = 0
+    symbol = 'EUR/USD'
+    
+    while (True):
+        pos = checkIfClosedPosition()
+        liveValue = con.get_candles(symbol, period="H1", columns=['date', 'bidclose', 'askclose'], with_index=False, number=1)
+        rsiData = con.get_candles(symbol, period="H1", number=500)
+        smaData = con.get_candles(symbol, period="H1", number=110)
+        slowemaData = con.get_candles(symbol, period="H1", number=26)
+        fastemaData = con.get_candles(symbol, period="H1", number=9)
 
-        #     print(symbol + " RSI : " + str(rsiValue))
+        rsiList = rsi(rsiData['bidclose'], 14)
+        smaList = sma(smaData['bidclose'], 110)
+        slowemaList = ema(slowemaData['bidclose'], 26)
+        fastemaList = ema(fastemaData['bidclose'], 9)
 
-        #     if (rsiValue > upper_rsi):
-        #         position(False, symbol) # Sell
-        #         openSymbols.append(symbol)
-        #         symbols.remove(symbol)
-        #         #con.close()
-        #         #exit(1)
-        #     if (rsiValue < lower_rsi):
-        #         position(True, symbol) # Buy
-        #         openSymbols.append(symbol)
-        #         symbols.remove(symbol)
-        #         #con.close()
-        #         #exit(1)
-        # time.sleep(5)
-        print("----------------");
+        if (stockfastEma == 0 and stockslowEma == 0):
+            stockfastEma = fastemaList[-1]
+            stockslowEma = slowemaList[-1]
+
+        emaInd = checkemaCross(emaInd, slowemaList, fastemaList, stockslowEma, stockfastEma)
+
+        if (pos == 0 and emaInd == 1 and liveValue['bidclose'][0] > smaList[-1]):
+            limit = liveValue['bidclose'][0] + (liveValue['bidclose'][0]/100)*16/10
+            stop = liveValue['bidclose'][0] - (liveValue['bidclose'][0]/10000) * 70
+            position(True, symbol, 500, limit, stop) # Buy
+        if (pos == 0 and liveValue['bidclose'][0] < smaList[-1] and emaInd == 0):
+            limit = liveValue['bidclose'][0] - (liveValue['bidclose'][0]/100)*16/10
+            stop = liveValue['bidclose'][0] + (liveValue['bidclose'][0]/10000) * 70
+            position(False, symbol, 500, limit, stop) # Sell
+        #time.sleep(5)
 
 con = fxcmpy.fxcmpy(access_token=token, log_level='error', server='demo', log_file='log.txt')
 
