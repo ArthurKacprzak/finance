@@ -178,12 +178,8 @@ def liveApp():
             # Sell position 
             position(False, symbol, 1000, limit, stop)
 
-<<<<<<< Updated upstream:version_1/Bot.py
-con = fxcmpy.fxcmpy(access_token=token, log_level='error', server='demo', log_file='../log.txt')
-=======
 #Connection to fxcm api
 con = fxcmpy.fxcmpy(access_token=token, log_level='error', server='demo', log_file='log.txt')
->>>>>>> Stashed changes:Bot.py
 
 if (len(sys.argv) > 1 and sys.argv[1].lower() == '-b'):
     backTesting()
